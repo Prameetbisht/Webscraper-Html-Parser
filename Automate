@@ -1,0 +1,105 @@
+# Importing packages
+from selenium import webdriver
+import os
+from bs4 import BeautifulSoup
+from selenium.webdriver.common.keys import Keys
+import time
+from pprint import pprint
+from selenium.common.exceptions import NoSuchElementException
+import parser
+import selenium.webdriver.support.ui as ui
+from selena2 import directory_create, file_create, url_sanitizer
+
+CURRENT_PATH = os.getcwd()
+ROOT_DIR = CURRENT_PATH.replace('\\html_downloaded_pages', '')
+DOWNLOAD_DIR = os.path.join(CURRENT_PATH, 'html_downloaded_pages')
+
+directory_create(DOWNLOAD_DIR)
+
+web_url_template = 'https://www.zagat.com/search?location_term=<<LOCATION>>&sort_order=2&pr_page=<<PAGE_NO>>'
+location = 'Orlando, Florida'
+default_page_no = '1'
+wait_t = 9
+
+
+def create_driver():
+    """
+
+    :return:
+    """
+    chrome_options = webdriver.ChromeOptions()
+    # chrome_options.add_argument('--headless')
+    # chrome_options.add_argument('--ignore-certificate-errors')
+    # chrome_options.add_argument('--ignore-ssl-errors')
+
+    driver = webdriver.Chrome(options=chrome_options,
+                              executable_path='C:\\Users\\cians\\Downloads\\chromedriver_win32\\chromedriver.exe')
+    return driver
+
+
+def kill_driver(driver=None):
+    """
+
+    :param driver:
+    :return:
+    """
+    if driver:
+        driver.close()
+        driver.quit()
+
+
+def get_total_page_count(URL=None, wait_time=wait_t):
+    if URL:
+        driver = create_driver()
+        driver.get(url=URL)
+        # wait time to open the website
+        print('going to sleep ')
+        time.sleep(wait_time)
+        hh = [idx.text for idx in driver.find_elements_by_class_name("zgt-place-results-page-numbers")]
+        # print(hh)
+        final_page = int(hh[0].split('of')[1].strip())
+        return final_page
+    else:
+        return 0
+
+
+def web_page_downloader(URL=None, wait_time=wait_t):
+    driver = create_driver()
+    driver.get(url=URL)
+    main_window = driver.current_window_handle
+    class_name = driver.find_elements_by_class_name("zgt-placecard-box")
+    count = 1
+    for link in class_name:
+        link.click()
+        time.sleep(wait_time)
+        windowHandle = driver.window_handles[count]
+        driver.switch_to.window(windowHandle)
+        print(driver.current_url)
+        time.sleep(wait_time)
+
+        # Create file and save the page source to that file
+        filename_create = url_sanitizer(driver.current_url) + ".html"
+        filepath_download = os.path.join(DOWNLOAD_DIR, filename_create)
+        print(driver.page_source)
+        file_create(filepath_download, driver.page_source)
+        time.sleep(wait_time)
+        driver.switch_to.window(main_window)
+        count = count + 1
+        time.sleep(wait_time)
+        # print('going for next page')
+        # for next_page in range(2, final_page + 1):
+        #     driver.get(
+        #         "https://www.zagat.com/search?location_id=230879&location_term=Orlando,"
+        #         "%20Florida&sort_order=2+&pr_page=" + str(next_page))
+
+    kill_driver(driver)
+
+
+if __name__ == '__main__':
+    web_page_url = web_url_template.replace("<<LOCATION>>", location).replace("<<PAGE_NO>>", default_page_no)
+    total_pages = get_total_page_count(URL=web_page_url)
+
+    # Open Page
+    for page_no in range(1, total_pages + 1):
+        web_page_url = web_url_template.replace("<<LOCATION>>", location).replace("<<PAGE_NO>>", str(page_no))
+        web_page_downloader(web_page_url)
